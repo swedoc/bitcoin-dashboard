@@ -1,0 +1,323 @@
+.pfi-box.orange<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bitcoin Sentiment Dashboard</title>
+<style>
+    body {
+        background-color: #111;
+        color: #eee;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        max-width: 420px;
+        margin-left: auto;
+        margin-right: auto;
+        overflow-x: hidden;
+    }
+    h1 {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .datasource-info {
+        max-width: 600px;
+        margin: 0 auto 20px auto;
+        background-color: #222;
+        padding: 12px;
+        border-radius: 10px;
+        color: #ccc;
+        font-size: 0.9em;
+        text-align: center;
+    }
+    .updated {
+        text-align: center;
+        font-size: 0.9em;
+        margin-bottom: 20px;
+        color: #bbb;
+    }
+    .box, .pair {
+        background-color: #222;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+        text-align: center;
+        box-sizing: border-box;
+    }
+    .title {
+        font-weight: bold;
+        margin-bottom: 8px;
+        font-size: 1.2em;
+        color: #eee;
+    }
+    .value {
+        font-size: 2em;
+        margin-bottom: 6px;
+        text-align: center;
+    }
+    .explanation {
+        margin-top: 4px;
+        font-size: 0.85em;
+        text-align: center;
+    }
+    .reference {
+        font-size: 0.75em;
+        color: #999;
+        margin-top: 4px;
+        text-align: center;
+    }
+    /* Color classes */
+    .red-dark { color: #d32f2f; }
+    .red-light { color: #ef5350; }
+    .green-light { color: #99ff99; }
+    .green-dark { color: #66ff66; }
+    .green { color: #66ff66; }
+    .orange { color: #ffa726; }
+    .gray { color: #888; }
+
+    .pair {
+        background-color: #1a1a1a;
+        border-radius: 10px;
+        padding: 10px;
+        margin: 8px auto;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .pair-title {
+        font-weight: bold;
+        margin-bottom: 4px;
+        font-size: 1em;
+        color: #eee;
+    }
+    @media (max-width: 480px) {
+        body {
+            padding: 10px;
+            max-width: 100%;
+        }
+        .box, .pair {
+            max-width: 100%;
+        }
+        .value {
+            font-size: 1.5em;
+        }
+    }
+    .pgl-box .explanation {
+        color: #eee;
+    }
+    .pfi-box {
+        max-width: 400px;
+        margin: 0 auto 20px auto;
+        padding: 20px 24px;
+        border-radius: 16px;
+        text-align: center;
+        background-color: #222;
+        border: 2px solid transparent;
+        box-shadow: none;
+        color: #eee;
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+        box-sizing: border-box;
+    }
+
+	/* Bullish / Long = grön */
+	.pfi-box.green-dark, .signal-box.green-dark,
+	.pfi-box.green, .signal-box.green {
+  	background-color: #1b5e20;
+  	border-color: #2e7d32;
+  	box-shadow: 0 8px 16px rgba(76, 175, 80, 0.6);
+  	color: #fff;
+	text-shadow: 1px 1px 2px #000; /* <-- Lägger till lite kontrast */
+	}
+
+	/* Neutral = orange */
+	.pfi-box.orange, .signal-box.orange {
+ 	 background-color: #5a2e00;
+  	border-color: #e65100;
+  	box-shadow: 0 8px 16px rgba(230, 81, 0, 0.6);
+  	color: #fff;
+	text-shadow: 1px 1px 2px #000; /* <-- Lägger till lite kontrast */
+	}
+
+	/* Bearish / Short = röd */
+	.pfi-box.red-dark, .signal-box.red-dark,
+	.pfi-box.red, .signal-box.red {
+  	background-color: #5d1212;
+  	border-color: #b71c1c;
+  	box-shadow: 0 8px 16px rgba(183, 28, 28, 0.6);
+  	color: #fff;
+	text-shadow: 1px 1px 2px #000; /* <-- Lägger till lite kontrast */
+	}
+
+   /*  .pfi-box:hover {
+        background: linear-gradient(145deg, #4caf50, #388e3c);
+        box-shadow: 0 12px 24px rgba(56, 142, 60, 0.8);
+    } */
+
+    .pfi-box .value {
+        font-size: 2em;
+        margin-bottom: 6px;
+        text-align: center;
+    }
+    .pfi-box .explanation, .pfi-box .reference-inline {
+        margin-top: 8px;
+        font-size: 0.9em;
+        text-align: center;
+        color: #ccc;
+    }
+    .signal-box {
+        max-width: 400px;
+        margin: 0 auto 20px auto;
+        padding: 16px;
+        border-radius: 12px;
+        background-color: #222;
+        box-sizing: border-box;
+        text-align: center;
+    }
+    .signal-box .value {
+        font-size: 2em;
+        margin: 0 auto;
+        text-align: center;
+    }
+</style>
+</head>
+<body>
+    <h1>Bitcoin Sentiment Dashboard</h1>
+
+    <div class="datasource-info">
+        Data sources: <strong>Binance API</strong> for price, funding rate, open interest, and volume.<br/>
+        Fear & Greed Index from <strong>Alternative.me</strong>.
+    </div>
+
+    <div class="updated">Last updated (CET): {{ timestamp }}</div>
+
+    <div class="box">
+        <div class="title">BTC Price (Binance)</div>
+        <div class="value" style="color: #eee;">
+            {{ (price_value/1000000)|round(3) }} million USD<br/>
+            ({{ (100000000/price_value)|int }} sats/USD)
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="title">Fear & Greed Index</div>
+        <div class="value {{ fgi_text[1] }}">
+            {{ fgi }} {{ qfi_arrow|safe }}
+        </div>
+        <div class="explanation {{ fgi_text[1] }}">{{ fgi_text[0] }}</div>
+        <div class="reference">
+            Reference levels:<br/>
+            <span class="red-dark">Extreme Fear:</span> 0–24,<br/>
+            <span class="red-light">Fear:</span> 25–49,<br/>
+            <span class="gray">Neutral:</span> 50–54,<br/>
+            <span class="green-light">Greed:</span> 55–74,<br/>
+            <span class="green-dark">Extreme Greed:</span> 75–100<br/>
+            ▲ = QFI direction
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="title">Funding Rate</div>
+        <div class="value {{ fr_text[1] }}">{{ funding_rate_str }}</div>
+        <div class="explanation {{ fr_text[1] }}">{{ fr_text[0] }}</div>
+
+	<div class="reference">
+	    Reference:
+    	    <span class="red-dark">Bearish &lt; -{{ fr_threshold }} ‰</span>,
+            <span class="orange">Neutral -{{ fr_threshold }} to {{ fr_threshold }} ‰</span>,
+            <span class="green-dark">Bullish &gt; {{ fr_threshold }} ‰</span>
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="title">Open Interest (Billion USD)</div>
+        <div class="value {{ oi_text[1] }}">{{ open_interest }}</div>
+        <div class="explanation {{ oi_text[1] }}">{{ oi_text[0] }}</div>
+        <div class="reference">
+            Reference:
+            <span class="red-dark">Low &lt; 6B</span>,
+            <span class="orange">Neutral 6–10B</span>,
+            <span class="green-dark">High &gt; 10B</span>
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="title">24h Volume (Billion USD)</div>
+        <div class="value {{ vol_text[1] }}">{{ volume }}</div>
+        <div class="explanation {{ vol_text[1] }}">{{ vol_text[0] }}</div>
+        <div class="reference">
+            Reference:
+            <span class="red-dark">Low &lt; 10B</span>,
+            <span class="orange">Neutral 10–20B</span>,
+            <span class="green-dark">High &gt; 20B</span>
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="title">ATR (14)</div>
+        <div class="value">{{ atr_str }} USD</div>
+        <div class="explanation">
+            Threshold: {{ atr_threshold_str }} USD
+            {% if atr_threshold_value is not none and price_value %}
+                ({{ (atr_threshold_value/price_value*100)|round(2) }}% of price)
+            {% endif %}<br/>
+            ATR measures average volatility and is used to filter volume & OI.<br/>
+            {% if not volatile %}
+            <em>Low volatility → ignored</em>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="box pgl-box">
+        <div class="title">Pierre Golden Line (PGL)</div>
+        <div class="value {{ pgl_color }}">{{ pgl_status[0] }}</div>
+        <div class="explanation">
+            PGL is a moving average-based momentum indicator calculated from daily BTC candles.<br/>
+            It signals bullish, neutral, eller bearish market phases.
+        </div>
+    </div>
+
+    <div class="box pfi-box {{ pfi_color }}">
+        <div class="title">Penta Factor Index (PFI)</div>
+        <div class="value
+            {% if pfi_text == 'Neutral' %} orange
+            {% elif pfi_text == 'Bullish' %} green
+            {% elif pfi_text == 'Bearish' %} red
+            {% else %} #eee
+            {% endif %}
+        ">
+            {{ pfi_text }} ({{ pfi_value }})
+        </div>
+        <div class="explanation">
+            PFI combines five indicators: Fear & Greed Index, Funding Rate, Open Interest, Volume, och PGL.
+        </div>
+        <div class="reference-inline">
+            Reference:
+            <span class="red-dark">≤ -3 Bearish (SELL)</span>,
+            <span class="orange">-2 to 2 Neutral (HOLD)</span>,
+            <span class="green">≥ 3 Bullish (BUY)</span>
+        </div>
+    </div>
+
+    <div class="signal-box {{ trade_class }}">
+        <div class="title">Trade Signal (based on PFI)</div>
+        <div class="value {{ trade_class }}">{{ trade_signal }}</div>
+        <div class="explanation">
+            Based on Penta Factor Index.<br/>
+            <strong>Interpretation:</strong><br/>
+            <span style="color:#99ff99;">“Long”</span> = open or hold long;<br/>
+            <span style="color:#ef5350;">“Short”</span> = open or hold short;<br/>
+            <span style="color:#ffa726;">“Neutral”</span> = flat position.
+        </div>
+    </div>
+
+    <div style="max-width: 400px; margin: 20px auto; color: #888; font-size: 0.8em; text-align: center; font-style: italic;">
+        The information, analysis and recommendations provided by this dashboard are for educational and informational purposes only and do not constitute financial, investment, tax or legal advice. Nothing on this platform should be construed as a recommendation or solicitation to buy, sell or hold any cryptocurrency or other financial instrument. Cryptocurrency trading involves substantial risks, including market volatility, liquidity constraints and regulatory uncertainty; losses can exceed initial capital. You are solely responsible for evaluating the merits and risks of any transaction, and you should consult a qualified financial, tax or legal professional before making any investment decision. Past performance is not indicative of future results. By using this dashboard, you acknowledge and accept full responsibility for your own trading decisions and agree that neither the dashboard’s creators nor any affiliates can be held liable for any gains, losses or damages arising from your use of the information provided.
+    </div>
+</body>
+</html>
+
