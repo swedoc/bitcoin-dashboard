@@ -74,42 +74,60 @@ def get_binance_klines(symbol="BTCUSDT", interval="1d", limit=500):
         return []
 
 def smma(series, length):
-    smma_values = []
-    for i in range(len(series)):
-        if i < length:
-            smma_values.append(sum(series[:i+1])/(i+1))
-        else:
-            prev = smma_values[-1]
-            smma_values.append((prev*(length-1) + series[i]) / length)
-    return smma_values
+    # Pine RMA/SMMA: seeda med SMA(length), sedan rekursivt filter
+    n = len(series)
+    out = [None] * n
+    if n < length:
+        return out
+    sma = sum(series[:length]) / length
+    out[length - 1] = sma
+    for i in range(length, n):
+        out[i] = (out[i - 1] * (length - 1) + series[i]) / length
+    return out
 
 def calc_pgl_status():
+    # Hämta senaste D1-klines och använd bara STÄNGDA barer
     klines = get_binance_klines(limit=60)
+    klines = klines[:-1]  # sista raden på Binance är pågående bar
     if not klines or len(klines) < 30:
         return ("Neutral", "orange"), 0
+
+    # HL2 (Pine: (high+low)/2)
     hl2 = []
     for k in klines:
         try:
-            high = float(k[2]); low = float(k[3])
-            hl2.append((high + low)/2)
+            high = float(k[2]); low = float(k[3]); close = float(k[4])
+            hl2.append((high + low + close) / 3.0)
         except:
             return ("Neutral", "orange"), 0
+
+    # SMMA/RMA (du bytte smma() tidigare till Pine-seedad version)
     v1 = smma(hl2, 15)
     m1 = smma(hl2, 19)
     m2 = smma(hl2, 25)
     v2 = smma(hl2, 29)
-    try:
-        p2 = ((v1[-1]<m1[-1]) != (v1[-1]<v2[-1])) or ((m2[-1]<v2[-1]) != (v1[-1]<v2[-1]))
-        p3 = (not p2) and (v1[-1]<v2[-1])
-        p1 = (not p2) and (not p3)
-    except:
+
+    # Liten tolerans: "nästan lika" ska bli Neutral (som TradingView visualiserar)
+    eps = 300
+    def lt(a, b):
+        return (a is not None and b is not None) and ((a + eps) < b)
+
+    v1_last, m1_last, m2_last, v2_last = v1[-1], m1[-1], m2[-1], v2[-1]
+    if None in (v1_last, m1_last, m2_last, v2_last):
         return ("Neutral", "orange"), 0
-    if p1:
-        return ("Bull", "green-dark"), 1
-    elif p2:
-        return ("Neutral", "orange"), 0
+
+    # EXAKT TradingView-färglogik (XOR): grå när relationerna är blandade
+    a = (v1_last + eps) < m1_last      # v1 < m1
+    b = (v1_last + eps) < v2_last      # v1 < v2  (referens)
+    c = (m2_last + eps) < v2_last      # m2 < v2
+
+    p2 = (a != b) or (c != b)          # Neutral (grå i TradingView)
+    if (not p2) and b:
+        return ("Bear", "red-dark"), -1     # violett i TV
+    elif (not p2) and (not b):
+        return ("Bull", "green-dark"), 1    # orange i TV
     else:
-        return ("Bear", "red-dark"), -1
+        return ("Neutral", "orange"), 0     # grå i TV
 
 def calculate_atr(lookback=250, atr_period=14):
     klines = get_binance_klines(limit=lookback + atr_period)
@@ -447,6 +465,47 @@ def api_signal():
     else:
         sig = "Neutral"
     return jsonify({"signal": sig, "score": smoothed})
+
+@app.route("/api/pgl")
+def api_pgl():
+    # samma logik som i calc_pgl_status, men exponera sista värdena
+    klines = get_binance_klines(limit=60)
+    klines = klines[:-1]  # bara stängda D1-barer
+
+    hl2 = []
+    for k in klines:
+        high = float(k[2]); low = float(k[3])
+        hl2.append((high + low) / 2.0)
+
+    v1 = smma(hl2, 15); m1 = smma(hl2, 19); m2 = smma(hl2, 25); v2 = smma(hl2, 29)
+    v1_last, m1_last, m2_last, v2_last = v1[-1], m1[-1], m2[-1], v2[-1]
+
+    eps = 1e-5
+    a = (v1_last + eps) < m1_last
+    b = (v1_last + eps) < v2_last
+    c = (m2_last + eps) < v2_last
+    p2 = (a != b) or (c != b)
+
+    if (not p2) and b:
+        status, color, score = "Bear", "red-dark", -1
+    elif (not p2) and (not b):
+        status, color, score = "Bull", "green-dark", 1
+    else:
+        status, color, score = "Neutral", "orange", 0
+
+    return jsonify({
+        "status": status,
+        "color": color,
+        "score": score,
+        "v1_last": v1_last,
+        "m1_last": m1_last,
+        "m2_last": m2_last,
+        "v2_last": v2_last,
+        "a_v1_lt_m1": a,
+        "b_v1_lt_v2": b,
+        "c_m2_lt_v2": c,
+        "p2_neutral_flag": p2
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
