@@ -6,6 +6,44 @@ from datetime import datetime
 import pytz
 from collections import deque
 
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from flask import request
+
+def _get_conn():
+    dsn = os.environ["DATABASE_URL"]
+    return psycopg2.connect(dsn, sslmode="require")
+
+def increment_and_get_total():
+    ua = (request.headers.get("User-Agent") or "").lower()
+    if any(x in ua for x in ["bot", "spider", "crawler", "preview", "monitor"]):
+        with _get_conn() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT COALESCE((SELECT value FROM counters WHERE name='page'), 0) AS value;")
+            return cur.fetchone()["value"]
+
+    with _get_conn() as conn:
+        conn.autocommit = True
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS counters (
+                    name  TEXT PRIMARY KEY,
+                    value BIGINT NOT NULL
+                );
+            """)
+            cur.execute("""
+                INSERT INTO counters(name, value)
+                VALUES ('page', 0)
+                ON CONFLICT (name) DO NOTHING;
+            """)
+            cur.execute("""
+                UPDATE counters
+                   SET value = value + 1
+                 WHERE name = 'page'
+             RETURNING value;
+            """)
+            return cur.fetchone()["value"]
+
 # Threshold för funding rate i promille (‰). Ändra här om du vill justera.
 FR_THRESHOLD_PER_MILLE = 0.1
 
