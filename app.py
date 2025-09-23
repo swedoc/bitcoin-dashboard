@@ -242,6 +242,7 @@ def interpret_pfi(total_score):
 
 @app.route("/")
 def index():
+	total_views = increment_and_get_total()
     fgi = get_fgi()
     price = get_price("BTCUSDT")
     funding_rate = get_funding_rate("BTCUSDT")
@@ -447,7 +448,8 @@ def index():
                            fr_vol=fr_vol,
                            oi_vol=oi_vol,
                            fgi_vol=fgi_vol,
-			   fr_threshold=FR_THRESHOLD_PER_MILLE
+			   			   fr_threshold=FR_THRESHOLD_PER_MILLE,
+						   total_views=total_views
 			)
 
 @app.route("/api/signal")
