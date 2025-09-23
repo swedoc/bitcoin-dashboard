@@ -242,29 +242,35 @@ def interpret_pfi(total_score):
 
 @app.route("/")
 def index():
-	total_views = increment_and_get_total()
-	fgi = get_fgi()
-	price = get_price("BTCUSDT")
-	funding_rate = get_funding_rate("BTCUSDT")
-	# Steg 1: Konvertera funding_rate till promille för logiken
-	fr_perm = funding_rate * 1000 if isinstance(funding_rate, (int, float)) else None
-	# Formatera funding rate för visning i promille
-	funding_rate_str = f"{fr_perm:.2f} ‰" if fr_perm is not None else "N/A"
-	
-	open_interest = get_open_interest()
-	volume = get_volume()
-	timestamp = get_cet_time()
+    total_views = increment_and_get_total()
+
+    fgi = get_fgi()
+    price = get_price("BTCUSDT")
+    funding_rate = get_funding_rate("BTCUSDT")
+
+    # Steg 1: Konvertera funding_rate till promille för logiken
+    fr_perm = funding_rate * 1000 if isinstance(funding_rate, (int, float)) else None
+    # Formatera funding rate för visning i promille
+    funding_rate_str = f"{fr_perm:.2f} ‰" if fr_perm is not None else "N/A"
+
+    open_interest = get_open_interest()
+    volume = get_volume()
+    timestamp = get_cet_time()
 
     dynamic_ratio = determine_dynamic_atr_ratio(symbol="BTCUSDT", lookback=250, atr_period=14, pct=0.20)
     if dynamic_ratio is None:
         dynamic_ratio = 0.01
-    atr = None; atr_threshold = None; volatile = True
+
+    atr = None
+    atr_threshold = None
+    volatile = True
     if isinstance(price, (int, float)):
         latest_atr, _ = calculate_atr(lookback=250, atr_period=14)
         if latest_atr is not None:
             atr = latest_atr
             atr_threshold = dynamic_ratio * price
             volatile = (atr >= atr_threshold)
+
 
     klines = get_binance_klines(limit=21)
     if len(klines) >= 21:
